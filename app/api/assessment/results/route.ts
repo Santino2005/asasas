@@ -13,22 +13,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const sql = neon(process.env.DATABASE_URL!);
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json(
+        { error: 'DATABASE_URL is not configured' },
+        { status: 500 }
+      );
+    }
 
-    // Get assessment results
+    const sql = neon(process.env.DATABASE_URL);
+
     const cardCountResult = await sql(
       'SELECT COUNT(*) as count FROM card_responses WHERE user_id = $1 AND selected = true',
       [userId]
     );
+
     const spatialCountResult = await sql(
       'SELECT COUNT(*) as count FROM spatial_responses WHERE user_id = $1',
       [userId]
     );
 
-    const totalCards = parseInt(cardCountResult[0]?.count || '0');
-    const totalSpatial = parseInt(spatialCountResult[0]?.count || '0');
+    const totalCards = Number(cardCountResult[0]?.count || 0);
+    const totalSpatial = Number(spatialCountResult[0]?.count || 0);
 
-    // Insert assessment results
     const result = await sql(
       `INSERT INTO assessment_results (user_id, total_cards_selected, total_spatial_responses)
        VALUES ($1, $2, $3)
@@ -54,49 +60,5 @@ export async function POST(request: NextRequest) {
       { error: error instanceof Error ? error.message : 'Failed to get results' },
       { status: 500 }
     );
-  }
-}
-
-    // Get assessment results
-    const cardCount = await client.query(
-      'SELECT COUNT(*) as count FROM card_responses WHERE user_id = $1 AND selected = true',
-      [userId]
-    );
-    const spatialCount = await client.query(
-      'SELECT COUNT(*) as count FROM spatial_responses WHERE user_id = $1',
-      [userId]
-    );
-
-    const totalCards = parseInt(cardCount.rows[0]?.count || '0');
-    const totalSpatial = parseInt(spatialCount.rows[0]?.count || '0');
-
-    // Insert assessment results
-    const result = await client.query(
-      `INSERT INTO assessment_results (user_id, total_cards_selected, total_spatial_responses)
-       VALUES ($1, $2, $3)
-       RETURNING id, completed_at`,
-      [userId, totalCards, totalSpatial]
-    );
-
-    return NextResponse.json(
-      {
-        success: true,
-        resultsId: result.rows[0].id,
-        completedAt: result.rows[0].completed_at,
-        summary: {
-          totalCards,
-          totalSpatial,
-        },
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error('Results error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to get results' },
-      { status: 500 }
-    );
-  } finally {
-    client.release();
   }
 }
